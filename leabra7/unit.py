@@ -83,8 +83,8 @@ def nxx1_table() -> Any:
     conv = np.convolve(ys, gaussian(res, std), mode="same")
 
     xs_valid = np.arange(-rng, 1.0 + res, res)
-    conv = conv[np.searchsorted(xs, xs_valid[0]):
-                np.searchsorted(xs, xs_valid[-1]) + 1]
+    conv = conv[np.searchsorted(xs, xs_valid[0]
+                                ):np.searchsorted(xs, xs_valid[-1]) + 1]
     return xs_valid, conv
 
 
@@ -216,19 +216,17 @@ class UnitGroup:
         inhibition.
 
         """
-        # yapf: disable
         self.i_net = (self.net * (self.spec.e_rev_e - self.v_m) +
                       self.spec.gc_l * (self.spec.e_rev_l - self.v_m) +
                       self.gc_i * (self.spec.e_rev_i - self.v_m))
-        self.v_m += (self.spec.integ * self.spec.vm_dt * (
-            self.i_net - self.adapt)).clamp(-100, 100)
+        self.v_m += (self.spec.integ * self.spec.vm_dt *
+                     (self.i_net - self.adapt)).clamp(-100, 100)
 
         self.i_net_r = (self.net * (self.spec.e_rev_e - self.v_m_eq) +
                         self.spec.gc_l * (self.spec.e_rev_l - self.v_m_eq) +
                         self.gc_i * (self.spec.e_rev_i - self.v_m_eq))
-        self.v_m_eq += (self.spec.integ * self.spec.vm_dt * (
-            self.i_net - self.adapt)).clamp_(-100, 100)
-        # yapf: enable
+        self.v_m_eq += (self.spec.integ * self.spec.vm_dt *
+                        (self.i_net - self.adapt)).clamp_(-100, 100)
 
     def nxx1(self, x: torch.Tensor) -> torch.Tensor:
         """Evaluates the noisy X/(X + 1) function.
@@ -252,11 +250,10 @@ class UnitGroup:
         This assumes we have already updated the unit membrane potential.
 
         """
-        # yapf: disable
-        g_e_thr = (self.gc_i * (self.spec.e_rev_i - self.spec.spk_thr) +
-                   self.spec.gc_l * (self.spec.e_rev_l - self.spec.spk_thr) -
-                   self.adapt) / (self.spec.spk_thr - self.spec.e_rev_e)
-        # yapf: enable
+        g_e_thr = (self.gc_i *
+                   (self.spec.e_rev_i - self.spec.spk_thr) + self.spec.gc_l *
+                   (self.spec.e_rev_l - self.spec.spk_thr) - self.adapt) / (
+                       self.spec.spk_thr - self.spec.e_rev_e)
 
         is_spiking = self.v_m > self.spec.spk_thr
         self.v_m[is_spiking] = self.spec.v_m_r
