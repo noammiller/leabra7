@@ -1,6 +1,7 @@
 """A layer, or group, of units."""
 import itertools
 from typing import List
+from typing import Dict
 from typing import Iterable
 
 import torch  # type: ignore
@@ -10,6 +11,7 @@ from leabra7 import specs
 from leabra7 import events
 from leabra7 import unit
 from leabra7 import utils
+from leabra7 import phases
 
 
 def _parse_unit_attr(attr: str) -> str:
@@ -70,14 +72,11 @@ class Layer(log.ObservableMixin, events.EventListenerMixin):
 
         # Desired clamping values
         self.act_ext = torch.Tensor(self.size).zero_()
-        # Last plus phase activation
-        self.acts_p = torch.Tensor(self.size).zero_()
-        # Last minus phase activation
-        self.acts_m = torch.Tensor(self.size).zero_()
-        # Cosine similarity between acts_p and acts_m
-        self.cos_diff = 0.0
-        # Cosine similiarity between acts_p and acts_m, integrated over trials
-        self.cos_diff_avg = 0.0
+        # Phase activation
+        self.acts: Dict[phases.Phase, torch.Tensor] = {}
+
+        for phase in phases.Phase.phases():
+            self.acts[phase] = torch.Tensor(self.size).zero_()
 
         # The following two buffers are filled every time self.add_input() is
         # called, and reset at the end of self.activation_cycle()
@@ -95,7 +94,7 @@ class Layer(log.ObservableMixin, events.EventListenerMixin):
         # When adding any loggable attribute or property to these lists, update
         # specs.LayerSpec._valid_log_on_cycle (we represent in two places to
         # avoid a circular dependency)
-        whole_attrs: List[str] = ["avg_act", "avg_net", "cos_diff_avg", "fbi"]
+        whole_attrs: List[str] = ["avg_act", "avg_net", "fbi"]
         parts_attrs: List[str] = [
             "unit_net", "unit_net_raw", "unit_gc_i", "unit_act", "unit_i_net",
             "unit_i_net_r", "unit_v_m", "unit_v_m_eq", "unit_adapt",
@@ -203,13 +202,7 @@ class Layer(log.ObservableMixin, events.EventListenerMixin):
 
     def update_trial_learning_averages(self) -> None:
         """Updates the learning averages computed at the end of each trial."""
-        cos_diff = torch.nn.functional.cosine_similarity(
-            self.acts_p, self.acts_m, dim=0)
-        self.cos_diff = utils.clip_float(low=0.01, high=0.99, x=cos_diff)
-        self.cos_diff_avg += self.spec.avg_dt * (cos_diff - self.cos_diff_avg)
-
-        acts_p_avg_eff = self.acts_p.mean().item()
-        self.units.update_trial_learning_averages(acts_p_avg_eff)
+        self.units.update_trial_learning_averages()
 
     @property
     def avg_s(self) -> torch.Tensor:
@@ -260,11 +253,10 @@ class Layer(log.ObservableMixin, events.EventListenerMixin):
         if isinstance(event, events.HardClamp):
             if event.layer_name == self.name:
                 self.hard_clamp(event.acts)
-        elif isinstance(event, events.EndPlusPhase):
-            self.acts_p.copy_(self.units.act)
+        elif isinstance(event, events.EndPhase):
+            self.acts[event.phase].copy_(self.units.act)
+        elif isinstance(event, events.EndTrial):
             self.update_trial_learning_averages()
-        elif isinstance(event, events.EndMinusPhase):
-            self.acts_m.copy_(self.units.act)
         elif isinstance(event, events.Unclamp):
             if event.layer_name == self.name:
                 self.unclamp()

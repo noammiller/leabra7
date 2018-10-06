@@ -50,7 +50,7 @@ def test_equality_check_for_frequencies(s) -> None:
     if s == "cycle":
         new_freq = ev.Frequency(name="cycle", end_event_type=ev.Cycle)
     elif s == "trial":
-        new_freq = ev.Frequency(name="trial", end_event_type=ev.EndPlusPhase)
+        new_freq = ev.Frequency(name="trial", end_event_type=ev.EndTrial)
     elif s == "epoch":
         new_freq = ev.Frequency(name="epoch", end_event_type=ev.EndEpoch)
     elif s == "batch":

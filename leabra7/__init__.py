@@ -9,3 +9,7 @@ from leabra7.rand import Gaussian
 from leabra7.rand import LogNormal
 from leabra7.rand import Scalar
 from leabra7.rand import Uniform
+from leabra7.phases import Phase
+from leabra7.phases import PlusPhase
+from leabra7.phases import MinusPhase
+from leabra7.phases import NonePhase

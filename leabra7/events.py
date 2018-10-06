@@ -6,6 +6,8 @@ from typing import Dict
 from typing import Sequence
 from typing import Type
 
+from leabra7 import phases
+
 
 class Event():
     """An atomic event is an event that the network can execute directly.
@@ -22,26 +24,6 @@ class Cycle(Event):
     pass
 
 
-class BeginPlusPhase(Event):
-    """The event that begins the plus phase in a trial."""
-    pass
-
-
-class EndPlusPhase(Event):
-    """The event that ends the plus phase in a trial."""
-    pass
-
-
-class BeginMinusPhase(Event):
-    """The event that begins the minus phase in a trial."""
-    pass
-
-
-class EndMinusPhase(Event):
-    """The event that ends the minus phase in a trial."""
-    pass
-
-
 class EndTrial(Event):
     """The event that signals the end of a trial."""
     pass
@@ -55,36 +37,6 @@ class EndEpoch(Event):
 class EndBatch(Event):
     """The event that signals the end of a batch."""
     pass
-
-
-class PauseLogging(Event):
-    """The event that pauses logging in the network.
-
-    Args:
-      freq_name: The name of the frequency for which to pause logging.
-
-    Raises:
-      ValueError: If no frequency exists with name `freq_name`.
-
-    """
-
-    def __init__(self, freq_name: str) -> None:
-        self.freq = Frequency.from_name(freq_name)
-
-
-class ResumeLogging(Event):
-    """The event that resumes logging in the network.
-
-    Args:
-      freq_name: The name of the frequency for which to resume logging.
-
-    Raises:
-      ValueError: If no frequency exists with name `freq_name`.
-
-    """
-
-    def __init__(self, freq_name: str) -> None:
-        self.freq = Frequency.from_name(freq_name)
 
 
 class HardClamp(Event):
@@ -124,6 +76,32 @@ class Unclamp(Event):
 class Learn(Event):
     """The event that triggers learning in projections."""
     pass
+
+
+class EventListenerMixin(metaclass=abc.ABCMeta):
+    """Defines an interface for handling network events.
+
+    This must be implemented by every object in the network.
+
+    """
+
+    @abc.abstractmethod
+    def handle(self, event: Event) -> None:
+        """When invoked, does any processing triggered by the event."""
+
+
+class BeginPhase(Event):
+    """The event that begins the phase in a trial."""
+
+    def __init__(self, phase: phases.Phase) -> None:
+        self.phase = phase
+
+
+class EndPhase(Event):
+    """The event that ends the phase in a trial."""
+
+    def __init__(self, phase: phases.Phase) -> None:
+        self.phase = phase
 
 
 class Frequency():
@@ -180,18 +158,36 @@ class Frequency():
 
 
 CycleFreq = Frequency(name="cycle", end_event_type=Cycle)
-TrialFreq = Frequency(name="trial", end_event_type=EndPlusPhase)
+TrialFreq = Frequency(name="trial", end_event_type=EndTrial)
 EpochFreq = Frequency(name="epoch", end_event_type=EndEpoch)
 BatchFreq = Frequency(name="batch", end_event_type=EndBatch)
 
 
-class EventListenerMixin(metaclass=abc.ABCMeta):
-    """Defines an interface for handling network events.
+class PauseLogging(Event):
+    """The event that pauses logging in the network.
 
-    This must be implemented by every object in the network.
+    Args:
+      freq_name: The name of the frequency for which to pause logging.
+
+    Raises:
+      ValueError: If no frequency exists with name `freq_name`.
 
     """
 
-    @abc.abstractmethod
-    def handle(self, event: Event) -> None:
-        """When invoked, does any processing triggered by the event."""
+    def __init__(self, freq_name: str) -> None:
+        self.freq = Frequency.from_name(freq_name)
+
+
+class ResumeLogging(Event):
+    """The event that resumes logging in the network.
+
+    Args:
+      freq_name: The name of the frequency for which to resume logging.
+
+    Raises:
+      ValueError: If no frequency exists with name `freq_name`.
+
+    """
+
+    def __init__(self, freq_name: str) -> None:
+        self.freq = Frequency.from_name(freq_name)

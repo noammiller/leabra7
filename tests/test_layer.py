@@ -10,6 +10,7 @@ import torch  # type: ignore
 from leabra7 import layer as lr
 from leabra7 import events as ev
 from leabra7 import specs as sp
+from leabra7 import phases as ph
 
 
 def test_parse_unit_attribute_strips_the_unit_prefix() -> None:
@@ -118,7 +119,7 @@ def test_layer_can_update_learning_averages_when_hard_clamped(mocker) -> None:
 
     layer.hard_clamp([1.0])
     layer.activation_cycle()
-    layer.handle(ev.EndPlusPhase())
+    layer.handle(ev.EndTrial())
 
     layer.units.update_cycle_learning_averages.assert_called_once()
     layer.update_trial_learning_averages.assert_called_once()
@@ -181,15 +182,16 @@ def test_hard_clamp_event_marks_layer_as_not_hidden() -> None:
     assert not layer.hidden
 
 
-def test_end_plus_phase_event_saves_activations() -> None:
+def test_end_phase_event_saves_activations() -> None:
     layer = lr.Layer("lr1", 3)
+
     layer.hard_clamp([0.8, 0, 0.8])
-    layer.handle(ev.EndPlusPhase())
-    assert (layer.acts_p == torch.Tensor([0.8, 0, 0.8])).all()
+    layer.handle(ev.EndPhase(ph.PlusPhase))
+    layer.hard_clamp([0.5, 0, 0.5])
+    layer.handle(ev.EndPhase(ph.MinusPhase))
+    layer.hard_clamp([0.2, 0, 0.2])
+    layer.handle(ev.EndPhase(ph.NonePhase))
 
-
-def test_end_minus_phase_event_saves_activations() -> None:
-    layer = lr.Layer("lr1", 3)
-    layer.hard_clamp([0.8, 0, 0.5])
-    layer.handle(ev.EndMinusPhase())
-    assert (layer.acts_m == torch.Tensor([0.8, 0, 0.5])).all()
+    assert (layer.acts[ph.PlusPhase] == torch.Tensor([0.8, 0, 0.8])).all()
+    assert (layer.acts[ph.MinusPhase] == torch.Tensor([0.5, 0, 0.5])).all()
+    assert (layer.acts[ph.NonePhase] == torch.Tensor([0.2, 0, 0.2])).all()

@@ -12,6 +12,7 @@ from leabra7 import specs
 from leabra7 import layer
 from leabra7 import log
 from leabra7 import events
+from leabra7 import utils
 
 T = TypeVar('T')
 
@@ -223,6 +224,12 @@ class Projn(events.EventListenerMixin, log.ObservableMixin):
         # Record the number of incoming connections for each unit
         self.num_recv_conns = torch.sum(self.mask, dim=1).float()
 
+        # Cosine similarity between plus and minus phase activations
+        self.cos_diff = 0.0
+        # Cosine similiarity between plus and minus phase activations,
+        # integrated over trials
+        self.cos_diff_avg = 0.0
+
         # When adding any loggable attribute or property to these lists, update
         # specs.ProjnSpec._valid_log_on_cycle (we represent in two places to
         # avoid a circular dependency)
@@ -280,6 +287,17 @@ class Projn(events.EventListenerMixin, log.ObservableMixin):
             self.spec.wt_scale_abs * wt_scale_act *
             (self.wts @ self.pre.units.act), self.spec.wt_scale_rel)
 
+    def update_cos_diff_trial_learning_averages(self) -> None:
+        """Updates the learning averages computed at the end of each trial."""
+
+        cos_diff = torch.nn.functional.cosine_similarity(
+            self.post.acts[self.spec.plus_phase],
+            self.post.acts[self.spec.minus_phase],
+            dim=0)
+        self.cos_diff = utils.clip_float(low=0.01, high=0.99, x=cos_diff)
+        self.cos_diff_avg += self.post.spec.avg_dt * (
+            cos_diff - self.cos_diff_avg)
+
     #pylint: disable=R0914
     def learn(self) -> None:
         """Updates weights with XCAL learning equation."""
@@ -290,7 +308,7 @@ class Projn(events.EventListenerMixin, log.ObservableMixin):
         sm_mix = s_mix * srs + (1 - s_mix) * srm
 
         # Compute cos diff avg
-        cos_diff_avg = self.post.cos_diff_avg
+        cos_diff_avg = self.cos_diff_avg
         if not self.spec.cos_diff_thr_l_mix:
             cos_diff_avg = 1
         if not self.post.hidden:
@@ -299,8 +317,8 @@ class Projn(events.EventListenerMixin, log.ObservableMixin):
         # Compute the learning rate modifier, if enabled
         lrate_mod = 1.0
         if self.spec.cos_diff_lrate:
-            diff = self.post.cos_diff
-            diff_avg = self.post.cos_diff_avg
+            diff = self.cos_diff
+            diff_avg = self.cos_diff_avg
             lo_diff = 0.0
             lo_lrate = 0.01
             hi_diff = 1.0
@@ -351,5 +369,7 @@ class Projn(events.EventListenerMixin, log.ObservableMixin):
 
     def handle(self, event: events.Event) -> None:
         """Overrides `event.EventListenerMixin.handle()`."""
-        if isinstance(event, events.Learn):
+        if isinstance(event, events.EndTrial):
+            self.update_cos_diff_trial_learning_averages()
+        elif isinstance(event, events.Learn):
             self.learn()

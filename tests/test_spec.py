@@ -7,6 +7,7 @@ import pytest
 from leabra7 import events as ev
 from leabra7 import layer as lr
 from leabra7 import specs as sp
+from leabra7 import phases as ph
 
 
 class Foo(sp.Spec):
@@ -356,6 +357,18 @@ def test_projn_spec_validates_sig_offset(f) -> None:
 def test_projn_spec_validates_thr_l_mix(f) -> None:
     with pytest.raises(sp.ValidationError):
         sp.ProjnSpec(thr_l_mix=f).validate()
+
+
+def test_projn_spec_validates_phases_are_not_equal() -> None:
+    with pytest.raises(sp.ValidationError):
+        sp.ProjnSpec(
+            minus_phase=ph.PlusPhase, plus_phase=ph.PlusPhase).validate()
+    with pytest.raises(sp.ValidationError):
+        sp.ProjnSpec(
+            minus_phase=ph.MinusPhase, plus_phase=ph.MinusPhase).validate()
+    with pytest.raises(sp.ValidationError):
+        sp.ProjnSpec(
+            minus_phase=ph.NonePhase, plus_phase=ph.NonePhase).validate()
 
 
 def test_projn_spec_validates_attrs_to_log() -> None:
